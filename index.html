@@ -277,9 +277,9 @@ const Audio8=(()=>{
   let ctx=null,master=null,on=true;
   /* BGM scheduler state */
   let bgmSeq=null,bgmStep=0,bgmNextTime=0,bgmRAF=null;
-  const LOOKAHEAD=0.12; // 先読み秒数（iOSでも安定）
-  const SCHEDULE_INTERVAL=50; // チェック間隔ms
-  function init(){if(ctx)return;ctx=new(window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=0.35;master.connect(ctx.destination);}
+  const LOOKAHEAD=0.5; // 先読み秒数（録画負荷でも途切れにくいよう拡大）
+  const SCHEDULE_INTERVAL=120; // チェック間隔ms（メインスレッド負荷を軽減）
+  function init(){if(ctx)return;try{ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:"playback"});}catch(e){ctx=new(window.AudioContext||window.webkitAudioContext)();}master=ctx.createGain();master.gain.value=0.5;master.connect(ctx.destination);}
   function resume(){if(ctx&&ctx.state==="suspended")ctx.resume();}
   /* ===== mp3 BGM（外部ファイル） ===== */
   let mp3El=null,mp3Track=null;
@@ -287,10 +287,10 @@ const Audio8=(()=>{
   function playMp3(name){
     const src=MP3_TRACKS[name];if(!src)return;
     stopSynthOnly();
-    if(!mp3El){mp3El=new Audio();mp3El.loop=true;mp3El.volume=0.42;}
+    if(!mp3El){mp3El=new Audio();mp3El.loop=true;mp3El.volume=0.22;mp3El.addEventListener("error",function(){console.error("[BGM] mp3読み込み失敗:",mp3El.src);});}
     if(mp3Track!==name){mp3El.src=src;mp3Track=name;}
     mp3El.currentTime=0;
-    const p=mp3El.play();if(p&&p.catch)p.catch(()=>{});
+    const p=mp3El.play();if(p&&p.catch)p.catch(function(e){console.error("[BGM] mp3再生失敗:",name,src,e&&e.message);});
   }
   function stopMp3(){if(mp3El){mp3El.pause();}}
   function setOn(v){on=v;if(!on){stopBGM();}else{}}
@@ -787,7 +787,6 @@ function particleBurst(opt={}){
     const sz=4+Math.random()*7;
     p.style.width=sz+"px";p.style.height=sz+"px";
     p.style.left=cx+"%";p.style.top=cy+"%";
-    p.style.boxShadow="0 0 6px "+c;
     stageEl.appendChild(p);
     const ang=Math.random()*Math.PI*2;
     const spd=power*(0.4+Math.random()*0.8);
@@ -1064,75 +1063,74 @@ function vortexImplode(){
 }
 function maouTransform(){
   // 第一形態の魔王を「倒れたと見せかけて」第二形態へ変身させる（劇的シーケンス）
+  // 順番：①演出（変身）→ ②会話（MAOU2.pre）→ ③戦闘
   hideBattleUI();portraits.classList.add("hidden");
   Audio8.stopBGM();
-  enemy=Object.assign({},MAOU2,{maxhp:MAOU2.hp});
   progress="boss2";saveGame();
-  runNovel(MAOU2.pre,"boss",()=>{
-    setStageBG("boss");
-    speaker.classList.remove("show");nextArrow.classList.remove("show");
-    // --- ① 断末魔：赤フラッシュ＋激しいシェイク（倒れたと見せかけ） ---
-    Audio8.sfx.damage();
-    fireEffect("redflash","go");
-    shake();setTimeout(shake,90);setTimeout(shake,180);setTimeout(shake,270);
-    dialogue.innerHTML="<span style='color:#ff5d5d;font-family:Press Start 2P;font-size:11px;line-height:1.8'>…ぐ、ぬ…</span><br>魔王が 崩れおちる——かに 見えた！";
-    // --- ② 暗転：闇に包まれる ---
+  setStageBG("boss");
+  // メッセージ枠だけ見える状態に
+  msgbox.style.display="";speaker.classList.remove("show");nextArrow.classList.remove("show");
+  // --- ① 断末魔：赤フラッシュ＋激しいシェイク（倒れたと見せかけ） ---
+  Audio8.sfx.damage();
+  fireEffect("redflash","go");
+  shake();setTimeout(shake,90);setTimeout(shake,180);setTimeout(shake,270);
+  dialogue.innerHTML="<span style='color:#ff5d5d;font-family:Press Start 2P;font-size:11px;line-height:1.8'>…ぐ、ぬ…</span><br>魔王が 崩れおちる——かに 見えた！";
+  // --- ② 暗転：闇に包まれる ---
+  setTimeout(function(){
+    fireEffect("blackout","go");
+    Audio8.sfx.superboss();
+  },700);
+  // --- ③ 魔法陣出現＋渦が collapse ---
+  setTimeout(function(){
+    var mc=$("magicCircle");
+    if(IMG_MAGIC_CIRCLE){mc.style.backgroundImage="url("+IMG_MAGIC_CIRCLE+")";mc.style.backgroundSize="contain";mc.style.backgroundRepeat="no-repeat";mc.classList.remove("css-mc");}
+    else{mc.classList.add("css-mc");}
+    fireEffect("magicCircle","go");
+    vortexImplode();
+    dialogue.innerHTML="<span style='color:#c77dff;font-family:Press Start 2P;font-size:11px;line-height:1.8'>!! ま さ か !!</span><br>黒い渦が 魔王を のみこんでいく…！";
+  },1100);
+  // --- ④ 稲妻フラッシュ連打＋カットイン ---
+  setTimeout(function(){
+    fireEffect("boltflash","go");
+    setTimeout(function(){fireEffect("boltflash","go");},200);
+    setTimeout(function(){fireEffect("boltflash","go");},400);
+    cutinTxt.textContent="!! "+MAOU2.name+" !!";
+    fireEffect("cutin","go");
+    fireEffect("speedlines","go");
+  },2000);
+  // --- ⑤ 第二形態：闇からせり上がって出現（下から登場） ---
+  setTimeout(function(){
+    setSpriteEl(enemySprite,MAOU2.img,MAOU2.sprite);enemySprite.classList.add("bossbig");
+    enemySprite.classList.remove("hidden");enemyName.textContent=MAOU2.name;
+    enemySprite.style.opacity="0";enemySprite.style.transform="translate(-50%,40%) scale(1.5)";
+    enemySprite.style.filter="brightness(0)";
+    enemySprite.style.transition="opacity .7s,transform .9s cubic-bezier(.2,.7,.3,1),filter .9s";
     setTimeout(function(){
-      fireEffect("blackout","go");
-      Audio8.sfx.superboss();
-    },700);
-    // --- ③ 魔法陣出現＋渦が collapse ---
-    setTimeout(function(){
-      var mc=$("magicCircle");
-      if(IMG_MAGIC_CIRCLE){mc.style.backgroundImage="url("+IMG_MAGIC_CIRCLE+")";mc.style.backgroundSize="contain";mc.style.backgroundRepeat="no-repeat";mc.classList.remove("css-mc");}
-      else{mc.classList.add("css-mc");}
-      fireEffect("magicCircle","go");
-      vortexImplode();
-      dialogue.innerHTML="<span style='color:#c77dff;font-family:Press Start 2P;font-size:11px;line-height:1.8'>!! ま さ か !!</span><br>黒い渦が 魔王を のみこんでいく…！";
-    },1100);
-    // --- ④ 稲妻フラッシュ連打＋カットイン ---
-    setTimeout(function(){
-      fireEffect("boltflash","go");
-      setTimeout(function(){fireEffect("boltflash","go");},200);
-      setTimeout(function(){fireEffect("boltflash","go");},400);
-      cutinTxt.textContent="!! "+MAOU2.name+" !!";
-      fireEffect("cutin","go");
-      fireEffect("speedlines","go");
-    },2000);
-    // --- ⑤ 第二形態：闇からせり上がって出現（下から登場） ---
-    setTimeout(function(){
-      setSpriteEl(enemySprite,MAOU2.img,MAOU2.sprite);enemySprite.classList.add("bossbig");
-      enemySprite.classList.remove("hidden");enemyName.textContent=MAOU2.name;
-      enemySprite.style.opacity="0";enemySprite.style.transform="translate(-50%,40%) scale(1.5)";
-      enemySprite.style.filter="brightness(0)";
-      enemySprite.style.transition="opacity .7s,transform .9s cubic-bezier(.2,.7,.3,1),filter .9s";
-      setTimeout(function(){
-        enemySprite.style.opacity="1";
-        enemySprite.style.transform="translate(-50%,-50%) scale(1)";
-        enemySprite.style.filter="brightness(1)";
-      },60);
-    },2300);
-    // --- ⑥ 咆哮：着地衝撃＋全力エフェクト ---
-    setTimeout(function(){
-      fireEffect("screenflash","go");
-      shockwave();
-      var gi=document.createElement("div");gi.className="ground-impact";stageEl.appendChild(gi);setTimeout(function(){gi.remove();},500);
-      particleBurst({colors:["#7b2cbf","#c77dff","#3a0ca3","#fff"],count:40,power:240,x:50,y:46});
-      hitStop(180);
-      shake();setTimeout(shake,100);setTimeout(shake,200);setTimeout(shake,300);
-      Audio8.sfx.superboss();
-      enemyName.classList.remove("hidden");
-      dialogue.innerHTML="<span style='color:#c77dff;font-family:Press Start 2P;font-size:11px;line-height:1.8'>!! 無限残業帝 降臨 !!</span>";
-    },3300);
-    // --- ⑦ 戦闘開始 ---
-    setTimeout(function(){
-      enemySprite.style.transition="";enemySprite.style.filter="";
-      enemySprite.classList.add("hidden");enemyName.classList.add("hidden");
-      enemy=Object.assign({},MAOU2,{maxhp:MAOU2.hp});
-      Audio8.playBGM("betrayal");
-      startBattle();
-    },4400);
-  });
+      enemySprite.style.opacity="1";
+      enemySprite.style.transform="translate(-50%,-50%) scale(1)";
+      enemySprite.style.filter="brightness(1)";
+    },60);
+  },2300);
+  // --- ⑥ 咆哮：着地衝撃＋全力エフェクト ---
+  setTimeout(function(){
+    fireEffect("screenflash","go");
+    shockwave();
+    var gi=document.createElement("div");gi.className="ground-impact";stageEl.appendChild(gi);setTimeout(function(){gi.remove();},500);
+    particleBurst({colors:["#7b2cbf","#c77dff","#3a0ca3","#fff"],count:40,power:240,x:50,y:46});
+    hitStop(180);
+    shake();setTimeout(shake,100);setTimeout(shake,200);setTimeout(shake,300);
+    Audio8.sfx.superboss();
+    enemyName.classList.remove("hidden");
+    dialogue.innerHTML="<span style='color:#c77dff;font-family:Press Start 2P;font-size:11px;line-height:1.8'>!! 無限残業帝 降臨 !!</span>";
+  },3300);
+  // --- ⑦ 演出が終わったら会話パート → 戦闘 ---
+  setTimeout(function(){
+    enemySprite.style.transition="";enemySprite.style.filter="";
+    enemy=Object.assign({},MAOU2,{maxhp:MAOU2.hp});
+    Audio8.playBGM("betrayal");
+    // 演出後に会話（MAOU2.pre）を見せてから戦闘開始
+    runNovel(MAOU2.pre,"boss",startBattle);
+  },4400);
 }
 function superBossEntrance(boss){
   hideBattleUI();portraits.classList.add("hidden");
