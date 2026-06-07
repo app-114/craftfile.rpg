@@ -283,17 +283,31 @@ const Audio8=(()=>{
   function init(){if(ctx)return;try{ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:"playback"});}catch(e){ctx=new(window.AudioContext||window.webkitAudioContext)();}master=ctx.createGain();master.gain.value=0.5;master.connect(ctx.destination);}
   function resume(){if(ctx&&ctx.state==="suspended")ctx.resume();}
   /* ===== mp3 BGM（外部ファイル） ===== */
-  const MP3_TRACKS={ "betrayal":"betrayal.mp3", "cryonic":"Cryonic_Pulse.mp3", "shinmetsu":"Kaminoken.mp3" };
+  const MP3_TRACKS={
+    "betrayal":{src:"Dai2KEITAI.mp3",start:35},
+    "cryonic":{src:"Cryonic_Pulse.mp3",start:0},
+    "shinmetsu":{src:"Kaminoken.mp3",start:0}
+  };
   const MP3_VOL=0.13; // mp3 BGM音量（SEとのバランス重視で控えめ）
   let mp3Els={},curMp3=null,mp3Unlocked=false;
   function getMp3(name){
     if(!mp3Els[name]){
-      const a=new Audio();a.loop=true;a.volume=MP3_VOL;a.preload="auto";a.src=MP3_TRACKS[name];
+      const t=MP3_TRACKS[name];
+      const a=new Audio();a.volume=MP3_VOL;a.preload="auto";a.src=t.src;
+      const startAt=t.start||0;
+      if(startAt>0){
+        // 開始位置を指定する曲は loop=false にして、終端で開始位置に手動で戻す
+        a.loop=false;
+        a.addEventListener("ended",function(){try{a.currentTime=startAt;a.play();}catch(e){}});
+      }else{
+        a.loop=true;
+      }
       a.addEventListener("error",function(){console.error("[BGM] mp3読み込み失敗:",a.src);});
       mp3Els[name]=a;
     }
     return mp3Els[name];
   }
+  function mp3Start(name){return (MP3_TRACKS[name]&&MP3_TRACKS[name].start)||0;}
   /* iOS対策：最初のユーザー操作で全mp3を一瞬鳴らして解錠 */
   function unlockMp3(){
     if(mp3Unlocked)return;mp3Unlocked=true;
@@ -305,7 +319,8 @@ const Audio8=(()=>{
     if(!MP3_TRACKS[name])return;
     stopSynthOnly();stopMp3();
     const a=getMp3(name);
-    curMp3=a;a.muted=false;a.volume=MP3_VOL;a.currentTime=0;
+    curMp3=a;a.muted=false;a.volume=MP3_VOL;
+    try{a.currentTime=mp3Start(name);}catch(e){}
     const p=a.play();if(p&&p.catch)p.catch(function(e){console.error("[BGM] mp3再生失敗:",name,e&&e.message);});
   }
   function stopMp3(){Object.keys(mp3Els).forEach(function(n){try{mp3Els[n].pause();}catch(e){}});curMp3=null;}
