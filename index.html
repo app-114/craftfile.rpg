@@ -152,6 +152,22 @@
   .craft-link{display:block;margin-top:2px;font-size:11px;color:#9ab;text-decoration:none;line-height:1.6;text-align:center;padding:4px;}
   .craft-link .craft-link-strong{color:var(--gold);font-size:12px;}
   .craft-link:active{opacity:.6;}
+  /* ===== CraftFile紹介ポップアップ ===== */
+  #cfModal{position:fixed;inset:0;background:rgba(0,0,8,.86);z-index:200;display:none;align-items:center;justify-content:center;padding:18px;-webkit-overflow-scrolling:touch;}
+  #cfModal.show{display:flex;}
+  .cf-card{background:linear-gradient(160deg,#10234d,#0a1730);border:3px solid var(--gold);border-radius:12px;max-width:360px;width:100%;max-height:88%;overflow-y:auto;padding:20px 18px;box-shadow:0 10px 40px rgba(0,0,0,.7);text-align:center;}
+  .cf-badge{display:inline-block;background:var(--gold);color:#3a2800;font-family:'Press Start 2P';font-size:9px;padding:5px 10px;border-radius:20px;margin-bottom:10px;letter-spacing:1px;}
+  .cf-card h2{font-family:'DotGothic16';color:var(--gold);font-size:20px;margin:4px 0 2px;}
+  .cf-sub{color:#9ab;font-size:11px;margin-bottom:14px;}
+  .cf-lead{color:#fff;font-size:13px;line-height:1.7;margin-bottom:14px;}
+  .cf-feat{text-align:left;margin:0 auto 16px;max-width:300px;}
+  .cf-feat li{color:#dfe7f5;font-size:12.5px;line-height:1.5;margin-bottom:9px;list-style:none;padding-left:22px;position:relative;}
+  .cf-feat li::before{content:"⚒";position:absolute;left:0;color:var(--gold);}
+  .cf-coming{background:rgba(247,201,72,.12);border:1px dashed var(--gold);border-radius:8px;padding:12px;margin-bottom:14px;}
+  .cf-coming b{color:var(--gold);font-family:'DotGothic16';font-size:15px;display:block;margin-bottom:3px;}
+  .cf-coming span{color:#cdd8ee;font-size:11px;}
+  .cf-close{font-family:'DotGothic16';font-size:15px;cursor:pointer;background:var(--panel-lt);color:#fff;border:2px solid var(--frame);padding:10px 30px;border-radius:6px;}
+  .cf-close:active{transform:translateY(1px);}
   .cta-btn{font-family:'DotGothic16';font-size:15px;cursor:pointer;background:linear-gradient(135deg,#f7c948,#e8a317);color:#3a2800;border:2px solid #fff3c4;padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;box-shadow:0 3px 0 #9a6b00;animation:ctaPulse 1.8s ease-in-out infinite;}
   .cta-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #9a6b00;}
   @keyframes ctaPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
@@ -231,7 +247,7 @@
         <button class="ov-btn" id="continueBtn" style="display:none">▶ つづきから</button>
         <button class="ov-btn" id="startBtn">▶ はじめから</button>
         <div id="saveInfo" class="small" style="min-height:16px"></div>
-        <a href="https://app.craftfile.jp/lp" target="_blank" rel="noopener" class="craft-link">この物語は実在のサービスがモデルです<br><span class="craft-link-strong">▶ CraftFile（工務店向け現場管理SaaS）を見る</span></a>
+        <a class="craft-link" id="craftLinkTitle" role="button" tabindex="0">この物語は実在のサービスがモデルです<br><span class="craft-link-strong">▶ CraftFile（工務店向け現場管理SaaS）とは？</span></a>
       </div>
       <div class="overlay" id="resultOverlay">
         <img src="" id="resultImg" class="result-img" alt="">
@@ -271,6 +287,27 @@
     </div>
   </div>
   <div class="footer">画面をタップで会話を送る／レベルアップで とくぎを おぼえる</div>
+</div>
+<div id="cfModal">
+  <div class="cf-card">
+    <div class="cf-badge">CRAFT FILE</div>
+    <h2>クラフトファイル</h2>
+    <div class="cf-sub">工務店・建設業のための 現場管理SaaS</div>
+    <div class="cf-lead">この物語に出てきた“魔法”は、<br>すべて実在する機能がモデルです。<br>事務作業の魔物を、現実でも退治しよう。</div>
+    <ul class="cf-feat">
+      <li>現場日報・勤怠をスマホで一瞬で記録</li>
+      <li>レシート写真からAIが経費を自動入力</li>
+      <li>見積〜電子契約までワンストップ</li>
+      <li>工程表ガントチャートで進捗を可視化</li>
+      <li>業者・顧客ポータルで情報共有</li>
+      <li>AIが外壁の劣化診断・カラーシミュ</li>
+    </ul>
+    <div class="cf-coming">
+      <b>近日 情報公開！</b>
+      <span>サービス詳細・先行登録は準備中です。<br>続報をお待ちください。</span>
+    </div>
+    <button class="cf-close" id="cfClose">とじる</button>
+  </div>
 </div>
 <script>
 /* ===== AUDIO ===== */
@@ -1209,7 +1246,7 @@ function finale(){Audio8.playBGM("town");setFinalFx(false);progress="done";delet
     rt.innerHTML="<span style='color:#f7c948;font-family:Press Start 2P;font-size:13px'>THE END</span>";
     rx.innerHTML="クリアおめでとう、"+heroName+"！<br><span style='font-size:11px;color:#9ab'>あなたは ふたりの創造主を 超えた。</span>"
       +"<br><span style='font-size:12px;color:#fff'>この『残業なき世界』を、あなたの現場でも。</span>"
-      +"<br><a href='https://app.craftfile.jp/lp' target='_blank' rel='noopener' class='cta-btn'>▶ CraftFileを無料で試す</a>"
+      +"<br><button class='cta-btn' id='cfCtaEnding'>▶ CraftFileってなに？</button>"
       +"<br><span style='font-size:10px;color:#788'>工務店向け 工程表・現場管理SaaS</span>";
     rb.textContent="↺ もう一度あそぶ";rb.style.display="";rb.onclick=()=>location.reload();
     hideBattleUI();portraits.classList.add("hidden");
@@ -1223,6 +1260,20 @@ function gameOver(){Audio8.stopBGM();Audio8.sfx.gameover();runNovel([{who:"narr"
 
 /* ===== START ===== */
 let pendingSave=null;
+/* ===== CraftFile紹介ポップアップ開閉 ===== */
+function openCfModal(){try{Audio8.sfx.select();}catch(e){}$("cfModal").classList.add("show");}
+function closeCfModal(){$("cfModal").classList.remove("show");}
+(function(){
+  var t=$("craftLinkTitle");if(t)t.addEventListener("click",openCfModal);
+  var c=$("cfClose");if(c)c.addEventListener("click",closeCfModal);
+  // 背景タップで閉じる
+  var m=$("cfModal");if(m)m.addEventListener("click",function(e){if(e.target===m)closeCfModal();});
+  // エンディングCTAは動的生成なのでイベント委任で拾う
+  document.addEventListener("click",function(e){
+    var el=e.target;
+    if(el&&(el.id==="cfCtaEnding"||(el.closest&&el.closest("#cfCtaEnding")))){openCfModal();}
+  });
+})();
 $("startBtn").onclick=()=>{Audio8.init();Audio8.resume();Audio8.unlockMp3();Audio8.sfx.select();deleteSave();closeOverlay($("titleScreen"));openOverlay($("nameScreen"));};
 $("continueBtn").onclick=()=>{
   Audio8.init();Audio8.resume();Audio8.unlockMp3();Audio8.sfx.select();
