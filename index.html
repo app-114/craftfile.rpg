@@ -147,8 +147,8 @@
   .big-emoji.is-img{width:80px;height:110px;font-size:0;background-position:center center;animation:none;margin-bottom:2px;}
   .title-logo{width:33%;max-width:115px;height:auto;image-rendering:auto;filter:drop-shadow(0 3px 8px rgba(0,0,0,.7));flex-shrink:0;}
   @keyframes logoFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.02)}}
-  #resultOverlay{justify-content:center;overflow:hidden;gap:6px;padding:12px 14px;}
-  #resultOverlay .ending-img{width:auto;max-width:62%;max-height:150px;}
+  #resultOverlay{justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;gap:5px;padding:10px 14px;}
+  #resultOverlay .ending-img{width:auto;max-width:50%;max-height:120px;}
   .craft-link{display:block;margin-top:2px;font-size:11px;color:#9ab;text-decoration:none;line-height:1.6;text-align:center;padding:4px;}
   .craft-link .craft-link-strong{color:var(--gold);font-size:12px;}
   .craft-link:active{opacity:.6;}
@@ -190,6 +190,7 @@
   .cmd:disabled:hover{background:var(--panel-lt);color:#fff;padding-left:8px;}
   .cmd:disabled:hover:before{opacity:0;}
   .cmd small{display:block;font-size:11px;opacity:.7;}
+  .cmd small.skd{font-size:12px;opacity:1;color:#bcd0ee;margin:2px 0 1px;line-height:1.3;}
   .full{grid-column:1/3;}
   .back{font-size:14px;color:#fff;text-align:center;padding:12px;background:var(--panel-lt);cursor:pointer;border:2px solid var(--frame);border-radius:4px;margin:8px 10px;display:block;font-family:'DotGothic16';}
   .back:active{background:var(--gold);color:#000;}
@@ -282,17 +283,32 @@ const Audio8=(()=>{
   function init(){if(ctx)return;try{ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:"playback"});}catch(e){ctx=new(window.AudioContext||window.webkitAudioContext)();}master=ctx.createGain();master.gain.value=0.5;master.connect(ctx.destination);}
   function resume(){if(ctx&&ctx.state==="suspended")ctx.resume();}
   /* ===== mp3 BGM（外部ファイル） ===== */
-  let mp3El=null,mp3Track=null;
   const MP3_TRACKS={ "betrayal":"betrayal.mp3", "cryonic":"Cryonic_Pulse.mp3", "shinmetsu":"Kaminoken.mp3" };
-  function playMp3(name){
-    const src=MP3_TRACKS[name];if(!src)return;
-    stopSynthOnly();
-    if(!mp3El){mp3El=new Audio();mp3El.loop=true;mp3El.volume=0.22;mp3El.addEventListener("error",function(){console.error("[BGM] mp3読み込み失敗:",mp3El.src);});}
-    if(mp3Track!==name){mp3El.src=src;mp3Track=name;}
-    mp3El.currentTime=0;
-    const p=mp3El.play();if(p&&p.catch)p.catch(function(e){console.error("[BGM] mp3再生失敗:",name,src,e&&e.message);});
+  const MP3_VOL=0.13; // mp3 BGM音量（SEとのバランス重視で控えめ）
+  let mp3Els={},curMp3=null,mp3Unlocked=false;
+  function getMp3(name){
+    if(!mp3Els[name]){
+      const a=new Audio();a.loop=true;a.volume=MP3_VOL;a.preload="auto";a.src=MP3_TRACKS[name];
+      a.addEventListener("error",function(){console.error("[BGM] mp3読み込み失敗:",a.src);});
+      mp3Els[name]=a;
+    }
+    return mp3Els[name];
   }
-  function stopMp3(){if(mp3El){mp3El.pause();}}
+  /* iOS対策：最初のユーザー操作で全mp3を一瞬鳴らして解錠 */
+  function unlockMp3(){
+    if(mp3Unlocked)return;mp3Unlocked=true;
+    Object.keys(MP3_TRACKS).forEach(function(n){
+      try{const a=getMp3(n);a.muted=true;const p=a.play();if(p&&p.then)p.then(function(){a.pause();a.currentTime=0;a.muted=false;}).catch(function(){a.muted=false;});}catch(e){}
+    });
+  }
+  function playMp3(name){
+    if(!MP3_TRACKS[name])return;
+    stopSynthOnly();stopMp3();
+    const a=getMp3(name);
+    curMp3=a;a.muted=false;a.volume=MP3_VOL;a.currentTime=0;
+    const p=a.play();if(p&&p.catch)p.catch(function(e){console.error("[BGM] mp3再生失敗:",name,e&&e.message);});
+  }
+  function stopMp3(){Object.keys(mp3Els).forEach(function(n){try{mp3Els[n].pause();}catch(e){}});curMp3=null;}
   function setOn(v){on=v;if(!on){stopBGM();}else{}}
   
   function isOn(){return on;}
@@ -482,7 +498,7 @@ const Audio8=(()=>{
     stopSynthOnly();
     stopMp3();
   }
-  return {init,resume,setOn,isOn,sfx,playBGM,stopBGM};
+  return {init,resume,setOn,isOn,sfx,playBGM,stopBGM,unlockMp3};
 })();
 
 /* ===== CHARACTERS ===== */
@@ -651,15 +667,15 @@ const FINALE=[
 
 /* ===== SKILLS (CraftFile 実機能ベース) ===== */
 const SKILLS=[
-  {lv:1,name:"日報スピード入力",mp:3,pow:14,line:"現場日報をサッと記録！作業・課題・経費が一発で残る！"},
-  {lv:2,name:"レシートAI解析",mp:4,pow:22,line:"レシート写真から 経費を自動抽出！入力の手間がゼロに！"},
-  {lv:3,name:"見積→契約フロー",mp:6,pow:34,line:"見積PDF発行から 電子契約署名まで 一気通貫！"},
-  {lv:4,name:"ガントチャート操作",mp:8,pow:46,line:"工程表をドラッグで再編成！全体スケジュールを掌握！"},
-  {lv:5,name:"業者ポータル連携",mp:8,pow:58,line:"QRで業者を招集！チェックリスト承認フローで現場を統制！"},
-  {lv:6,name:"カラーシミュレーション",mp:10,pow:74,line:"外壁の色をAIが部位検出して塗り替え！顧客の心をつかむ！"},
-  {lv:7,name:"AI提案書ジェネレート",mp:12,pow:92,line:"競合を解析し Claudeが提案文を生成！受注をもぎ取る！"},
-  {lv:8,name:"顧客ポータル共有",mp:14,pow:112,line:"QR共有で工程と写真を顧客に公開！信頼を勝ち取る！"},
-  {lv:9,name:"AI劣化診断・極",mp:16,pow:150,line:"写真をSAM2で解析→面ごとに劣化を特定→診断レポート完成！必殺！"},
+  {lv:1,name:"日報スピード入力",desc:"スマホで現場日報を一瞬で記録",mp:3,pow:14,line:"現場日報をサッと記録！作業・課題・経費が一発で残る！"},
+  {lv:2,name:"レシートAI解析",desc:"レシートを撮るだけAIが経費入力",mp:4,pow:22,line:"レシート写真から 経費を自動抽出！入力の手間がゼロに！"},
+  {lv:3,name:"見積・電子契約",desc:"見積PDFから契約サインまで一気に",mp:6,pow:34,line:"見積PDF発行から 電子契約署名まで 一気通貫！"},
+  {lv:4,name:"工程表ガントチャート",desc:"指でドラッグして工程を組み替え",mp:8,pow:46,line:"工程表をドラッグで再編成！全体スケジュールを掌握！"},
+  {lv:5,name:"業者ポータル連携",desc:"QRで職人と工程・写真を共有",mp:8,pow:58,line:"QRで業者を招集！チェックリスト承認フローで現場を統制！"},
+  {lv:6,name:"AIカラーシミュ",desc:"外壁の色をAIが塗り替えて提案",mp:10,pow:74,line:"外壁の色をAIが部位検出して塗り替え！顧客の心をつかむ！"},
+  {lv:7,name:"AI提案書ジェネレート",desc:"競合を解析しAIが提案文を作成",mp:12,pow:92,line:"競合を解析し Claudeが提案文を生成！受注をもぎ取る！"},
+  {lv:8,name:"顧客ポータル共有",desc:"工程と写真をお客様に公開",mp:14,pow:112,line:"QR共有で工程と写真を顧客に公開！信頼を勝ち取る！"},
+  {lv:9,name:"AI劣化診断・極",desc:"写真からAIが劣化を診断しPDF化",mp:16,pow:150,line:"写真をAIが解析→面ごとに劣化を特定→診断レポート完成！必殺！"},
 ];
 
 /* ===== STATE ===== */
@@ -960,7 +976,7 @@ function startBattle(){
 $("cmdAttack").onclick=()=>{if(busy)return;Audio8.sfx.attack();lock(true);const d=dealDamage(hero.atk);battleMsg(heroName+"の こうげき！ "+d+"の ダメージ！");afterPlayerTurn();};
 $("cmdGuard").onclick=()=>{if(busy)return;Audio8.sfx.guard();lock(true);guarding=true;const heal=Math.floor(hero.maxhp*0.2);const mpr=Math.floor(hero.maxmp*0.25);hero.hp=Math.min(hero.maxhp,hero.hp+heal);hero.mp=Math.min(hero.maxmp,hero.mp+mpr);refresh();battleMsg("たいせいを たてなおす！ HP+"+heal+" MP+"+mpr+" かいふく。");setTimeout(enemyTurn,650);};
 $("cmdRun").onclick=()=>{if(busy)return;Audio8.sfx.select();const heal=Math.floor(hero.maxhp*0.25),mp=Math.floor(hero.maxmp*0.4);hero.hp=Math.min(hero.maxhp,hero.hp+heal);hero.mp=Math.min(hero.maxmp,hero.mp+mp);refresh();battleMsg("ふか呼吸して しきりなおした。HP+"+heal+" MP+"+mp+" かいふく！");lock(true);setTimeout(enemyTurn,650);};
-$("cmdSkill").onclick=()=>{if(busy)return;Audio8.sfx.select();$("rootMenu").classList.add("hidden");$("skillMenu").classList.remove("hidden");const list=$("skillList");list.innerHTML="";SKILLS.filter(s=>s.lv<=hero.lv).forEach(s=>{const b=document.createElement("button");b.className="cmd full";b.innerHTML=s.name+"<small>MP"+s.mp+" / いりょく"+s.pow+"</small>";if(hero.mp<s.mp)b.disabled=true;b.onclick=()=>useSkill(s);list.appendChild(b);});};
+$("cmdSkill").onclick=()=>{if(busy)return;Audio8.sfx.select();$("rootMenu").classList.add("hidden");$("skillMenu").classList.remove("hidden");const list=$("skillList");list.innerHTML="";SKILLS.filter(s=>s.lv<=hero.lv).forEach(s=>{const b=document.createElement("button");b.className="cmd full";b.innerHTML=s.name+"<small class='skd'>"+(s.desc||"")+"</small><small>MP"+s.mp+" ／ いりょく"+s.pow+"</small>";if(hero.mp<s.mp)b.disabled=true;b.onclick=()=>useSkill(s);list.appendChild(b);});};
 $("skillBack").onclick=()=>{Audio8.sfx.select();$("skillMenu").classList.add("hidden");$("rootMenu").classList.remove("hidden");};
 function useSkill(s){
   Audio8.sfx.skill();$("skillMenu").classList.add("hidden");$("rootMenu").classList.remove("hidden");lock(true);
@@ -1192,9 +1208,9 @@ function gameOver(){Audio8.stopBGM();Audio8.sfx.gameover();runNovel([{who:"narr"
 
 /* ===== START ===== */
 let pendingSave=null;
-$("startBtn").onclick=()=>{Audio8.init();Audio8.resume();Audio8.sfx.select();deleteSave();closeOverlay($("titleScreen"));openOverlay($("nameScreen"));};
+$("startBtn").onclick=()=>{Audio8.init();Audio8.resume();Audio8.unlockMp3();Audio8.sfx.select();deleteSave();closeOverlay($("titleScreen"));openOverlay($("nameScreen"));};
 $("continueBtn").onclick=()=>{
-  Audio8.init();Audio8.resume();Audio8.sfx.select();
+  Audio8.init();Audio8.resume();Audio8.unlockMp3();Audio8.sfx.select();
   if(!pendingSave){return;}
   applySave(pendingSave);
   closeOverlay($("titleScreen"));
